@@ -1937,7 +1937,7 @@ try {
     const dockerfilePath = core.getInput('dockerfile-path');
     console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
 
-    const payload = JSON.stringify(github.context.payload, undefined, 2)
+    const payload = JSON.stringify(github.context, undefined, 2)
     console.log(`The event payload: ${payload}`);
 
     buildDockerImage(dockerfilePath)
