@@ -1934,7 +1934,7 @@ try {
     const containerPort = core.getInput('container-port');
     // const secret = core.getInput('schema-analysis-secret');
     const backendUrl = core.getInput('url');
-    const dockerfileFolder = core.getInput('dockerfile-folder');
+    const dockerfileFolder = core.getInput('dockerfile-path');
     console.log(`Container port: ${containerPort}!`);
 
     buildDockerImage(dockerfileFolder)
@@ -1955,10 +1955,9 @@ try {
             return querySchema('http://localhost:4000/graphql');
         })
         .then((schema) => {
-            return sendSchema(secret, schema);
+            return sendSchema(schema,backendUrl);
         })
         .then((success) => {
-            // core.setOutput("time", time);
             console.log(success);
         }, (failed) => {
             console.log(failed);
@@ -2011,7 +2010,7 @@ function execute(command, args) {
 }
 
 async function sendSchema(schema, backendUrl) {
-    return await node_fetch__WEBPACK_IMPORTED_MODULE_0___default()(backendUrl, {
+    return await node_fetch__WEBPACK_IMPORTED_MODULE_0___default()(backendUrl + "?secret=na", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schema }),
