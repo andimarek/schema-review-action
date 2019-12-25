@@ -1934,10 +1934,10 @@ try {
     const containerPort = core.getInput('container-port');
     // const secret = core.getInput('schema-analysis-secret');
     const backendUrl = core.getInput('url');
-    const dockerfileFolder = core.getInput('dockerfile-path');
-    console.log(`Container port: ${containerPort}!`);
+    const dockerfilePath = core.getInput('dockerfile-path');
+    console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
 
-    buildDockerImage(dockerfileFolder)
+    buildDockerImage(dockerfilePath)
         .then((imageId) => {
             return runImage(imageId, containerPort);
         })
@@ -1955,7 +1955,7 @@ try {
             return querySchema('http://localhost:4000/graphql');
         })
         .then((schema) => {
-            return sendSchema(schema,backendUrl);
+            return sendSchema(schema, backendUrl);
         })
         .then((success) => {
             console.log(success);
@@ -1974,8 +1974,8 @@ function runImage(imageId, containerPort) {
     return execute('docker', ['run', '-d', '-p', `4000:${containerPort}`, imageId]);
 }
 
-function buildDockerImage(dockerfileFolder) {
-    return execute('docker', ['build', dockerfileFolder, '-q']).then(
+function buildDockerImage(dockerfilePath) {
+    return execute('docker', ['build', dockerfilePath, '-q']).then(
         (imageId) => {
             return imageId.trim();
         },
