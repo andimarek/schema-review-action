@@ -10,7 +10,7 @@ try {
     const containerPort = core.getInput('container-port');
     // const secret = core.getInput('schema-analysis-secret');
     const backendUrl = core.getInput('url');
-    const dockerfileFolder = core.getInput('dockerfile-folder');
+    const dockerfileFolder = core.getInput('dockerfile-path');
     console.log(`Container port: ${containerPort}!`);
 
     buildDockerImage(dockerfileFolder)
