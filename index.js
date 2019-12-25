@@ -13,8 +13,27 @@ try {
     const dockerfilePath = core.getInput('dockerfile-path');
     console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
 
-    const payload = JSON.stringify(github.context, undefined, 2)
-    console.log(`The event payload: ${payload}`);
+    // const payload = JSON.stringify(github.context, undefined, 2)
+    const { eventName, payload, sha } = github.context;
+    const pullRequest = payload['pull_request'];
+    const action = payload.action;
+    const repository = payload.repository;
+    const repoId = repository.id;
+    const repoName = repository.name;
+    const repoOwner = repository.owner.login;
+
+    // const base = pullRequest.base;
+    const head = pullRequest.head;
+    const headSha = head.sha;
+
+    console.log(`eventName ${eventName}`);
+    console.log(`action ${action}`);
+    console.log(`repoId ${repoId}`);
+    console.log(`repoName ${repoName}`);
+    console.log(`repoOwner ${repoOwner}`);
+    console.log(`sha: ${sha}`);
+    console.log(`head sha: ${headSha}`);
+
 
     buildDockerImage(dockerfilePath)
         .then((imageId) => {
