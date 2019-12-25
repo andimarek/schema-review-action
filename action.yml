@@ -1,0 +1,27 @@
+name: 'GraphQL Schema review'
+description: 'Trigger schema review'
+inputs:
+  container-port: 
+    description: 'the exposed port of the container'
+    required: true
+    default: '8080'
+  dockerfile-folder:
+    description: 'the folder where to build the docker image from'
+    required: true
+    default: '.'
+  # dockerfile: 
+  #   description: 'the dockerfile to build'
+  #   required: true
+  #   default: 'Dockerfile'
+  url: 
+    description: 'the schema review backend url'
+    required: true
+  # schema-analysis-secret:
+  #   description: 'secret for this repo'
+  #   required: true
+# outputs:
+#   success: 
+#     description: 'successful or not'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
