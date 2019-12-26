@@ -14,8 +14,9 @@ try {
     console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
 
     // const payload = JSON.stringify(github.context, undefined, 2)
-    const { eventName, payload, sha } = github.context;
+    const { eventName, payload, sha: mergeSha } = github.context;
     const pullRequest = payload['pull_request'];
+    const prNumber = pullRequest.number;
     const action = payload.action;
     const repository = payload.repository;
     const repoId = repository.id;
@@ -28,11 +29,22 @@ try {
 
     console.log(`eventName ${eventName}`);
     console.log(`action ${action}`);
+
     console.log(`repoId ${repoId}`);
-    console.log(`repoName ${repoName}`);
     console.log(`repoOwner ${repoOwner}`);
-    console.log(`sha: ${sha}`);
-    console.log(`head sha: ${headSha}`);
+    console.log(`repoName ${repoName}`);
+
+    console.log(`prNumber ${prNumber}`);
+    console.log(`mergeSha: ${mergeSha}`);
+    console.log(`headSha: ${headSha}`);
+    const pullRequestData = {
+        repoId,
+        repoOwner,
+        repoName,
+        prNumber,
+        mergeSha,
+        headSha
+    };
 
 
     buildDockerImage(dockerfilePath)
@@ -53,7 +65,7 @@ try {
             return querySchema('http://localhost:4000/graphql');
         })
         .then((schema) => {
-            return sendSchema(schema, backendUrl);
+            return sendSchema(schema, backendUrl, pullRequestData);
         })
         .then((success) => {
             console.log(success);
@@ -107,11 +119,15 @@ function execute(command, args) {
     });
 }
 
-async function sendSchema(schema, backendUrl) {
+async function sendSchema(schema, backendUrl, pullRequestData) {
+    const body = {
+        schema,
+        ...pullRequestData
+    }
     return await fetch(backendUrl + "?secret=na", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schema }),
+        body: JSON.stringify(body),
     }).then(res => {
         console.log('send schema response:', res);
         return res.json();
