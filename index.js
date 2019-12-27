@@ -8,6 +8,8 @@ import { buildClientSchema } from 'graphql/utilities/buildClientSchema'
 import { printSchema } from 'graphql/utilities/schemaPrinter'
 
 
+const backendUrl = 'https://backend.graphql-consulting.com/schema-review/push';
+
 try {
     const data = readSchemaReviewConfig();
     const schemaSource = data['schema-source'];
@@ -21,7 +23,7 @@ try {
         dockerfilePath = ".";
     }
     // // const secret = core.getInput('schema-analysis-secret');
-    const backendUrl = core.getInput('url');
+    // const backendUrl = core.getInput('url');
     console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
 
     // const payload = JSON.stringify(github.context, undefined, 2)
