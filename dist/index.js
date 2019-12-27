@@ -1931,10 +1931,19 @@ const github = __webpack_require__(469);
 
 
 try {
-    const containerPort = core.getInput('container-port');
-    // const secret = core.getInput('schema-analysis-secret');
+    const data = readSchemaReviewConfig();
+    const schemaSource = data['schema-source'];
+    assertExists(schemaSource, "invalid config file; expect schema-source")
+    const introspectServer = schemaSource['introspect-server'];
+    assertExists(schemaSource, "invalid config file: expect introspect-server")
+    const containerPort = introspectServer['container-port'];
+    assertExists(schemaSource, "invalid config file: expect introspect-server: container-port")
+    const dockerfilePath = introspectServer['dockerfile-path'];
+    if (!dockerfilePath) {
+        dockerfilePath = ".";
+    }
+    // // const secret = core.getInput('schema-analysis-secret');
     const backendUrl = core.getInput('url');
-    const dockerfilePath = core.getInput('dockerfile-path');
     console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
 
     // const payload = JSON.stringify(github.context, undefined, 2)
@@ -2076,8 +2085,21 @@ async function querySchema(endpoint) {
     } catch (err) {
         return { status: 'err', message: err.message }
     }
-
 }
+
+function readSchemaReviewConfig() {
+    let fileContents = fs.readFileSync('./schema-review.yml', 'utf8');
+    assertExists(fileContents, "expect schema-review.yml file");
+    let config = yaml.safeLoad(fileContents);
+    return config;
+}
+
+function assertExists(val, message) {
+    if (!val) {
+        throw new Error(message);
+    }
+}
+
 
 /***/ }),
 
