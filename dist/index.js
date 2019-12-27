@@ -2479,6 +2479,8 @@ const yaml = __webpack_require__(414);
 
 
 
+const backendUrl = 'https://backend.graphql-consulting.com/schema-review/push';
+
 try {
     const data = readSchemaReviewConfig();
     const schemaSource = data['schema-source'];
@@ -2492,7 +2494,7 @@ try {
         dockerfilePath = ".";
     }
     // // const secret = core.getInput('schema-analysis-secret');
-    const backendUrl = core.getInput('url');
+    // const backendUrl = core.getInput('url');
     console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
 
     // const payload = JSON.stringify(github.context, undefined, 2)
@@ -2606,6 +2608,7 @@ async function sendSchema(schema, backendUrl, pullRequestData) {
         schema,
         ...pullRequestData
     }
+
     return await node_fetch__WEBPACK_IMPORTED_MODULE_0___default()(backendUrl + "?secret=na", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

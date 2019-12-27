@@ -137,6 +137,7 @@ async function sendSchema(schema, backendUrl, pullRequestData) {
         schema,
         ...pullRequestData
     }
+
     return await fetch(backendUrl + "?secret=na", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
