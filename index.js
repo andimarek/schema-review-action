@@ -1,5 +1,7 @@
 const core = require('@actions/core');
 const github = require('@actions/github');
+const fs = require('fs');
+const yaml = require('js-yaml');
 import fetch from 'node-fetch'
 import { introspectionQuery } from 'graphql/utilities/introspectionQuery'
 import { buildClientSchema } from 'graphql/utilities/buildClientSchema'
