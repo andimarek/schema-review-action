@@ -31,73 +31,102 @@ try {
 
     const isPush = eventName === 'push';
     const isPullRequest = eventName === 'pull_request';
+
     if (isPush) {
         const context = JSON.stringify(github.context, undefined, 2)
         console.log(`payload for push ${context}`)
-    } else if(isPullRequest){
-        const pullRequest = payload['pull_request'];
-        const prNumber = pullRequest.number;
-        const repository = payload.repository;
-        const repoId = repository.id;
-        const repoName = repository.name;
-        const repoOwner = repository.owner.login;
-
-        const head = pullRequest.head;
-        const headSha = head.sha;
-
-
-        console.log(`repoId ${repoId}`);
-        console.log(`repoOwner ${repoOwner}`);
-        console.log(`repoName ${repoName}`);
-
-        console.log(`prNumber ${prNumber}`);
-        console.log(`mergeSha: ${mergeSha}`);
-        console.log(`headSha: ${headSha}`);
-
-        const pullRequestData = {
-            repoId,
-            repoOwner,
-            repoName,
-            prNumber,
-            mergeSha,
-            headSha
-        };
-
-
-        buildDockerImage(dockerfilePath)
-            .then((imageId) => {
-                return runImage(imageId, containerPort);
-            })
-            .then(() => {
-                return new Promise(resolve => {
-                    console.log('waiting for docker image to come up');
-                    setTimeout(() => {
-                        console.log('waiting finished')
-                        resolve()
-                    },
-                        5000);
-                });
-            })
-            .then(() => {
-                return querySchema('http://localhost:4000/graphql');
-            })
-            .then((schema) => {
-                return sendSchema(schema, backendUrl, pullRequestData);
-            })
-            .then((success) => {
-                console.log(success);
-            }, (failed) => {
-                console.log(failed);
-            })
-            .catch(error => {
-                console.log(error);
-            });
-    }else {
+        handlePush(payload, dockerfilePath, containerPort);
+    } else if (isPullRequest) {
+        handlePullRequest(payload);
+    } else {
         throw new Error(`triggered by unexpected event ${eventName}`);
     }
 
 } catch (error) {
     core.setFailed(error.message);
+}
+
+function handlePush(payload, dockerfilePath, containerPort) {
+    const repository = payload.repository;
+    const repoId = repository.id;
+    const repoOwner = repository.owner.login;
+    const repoName = repository.name;
+    const sha = payload.after;
+
+    const body = {
+        action: 'push',
+        repoId,
+        repoOwner,
+        repoName,
+        sha
+    };
+
+    querySchemaAndPush(dockerfilePath, containerPort, body);
+}
+
+function handlePullRequest(payload, dockerfilePath, containerPort) {
+    const pullRequest = payload['pull_request'];
+    const prNumber = pullRequest.number;
+    const repository = payload.repository;
+    const repoId = repository.id;
+    const repoName = repository.name;
+    const repoOwner = repository.owner.login;
+
+    const head = pullRequest.head;
+    const headSha = head.sha;
+
+
+    console.log(`repoId ${repoId}`);
+    console.log(`repoOwner ${repoOwner}`);
+    console.log(`repoName ${repoName}`);
+
+    console.log(`prNumber ${prNumber}`);
+    console.log(`mergeSha: ${mergeSha}`);
+    console.log(`headSha: ${headSha}`);
+
+    const body = {
+        action: 'review',
+        repoId,
+        repoOwner,
+        repoName,
+        prNumber,
+        mergeSha,
+        headSha
+    };
+
+    querySchemaAndPush(dockerfilePath, containerPort, body);
+}
+
+function querySchemaAndPush(dockerfilePath, containerPort, body) {
+    buildDockerImage(dockerfilePath)
+        .then((imageId) => {
+            return runImage(imageId, containerPort);
+        })
+        .then(() => {
+            return new Promise(resolve => {
+                console.log('waiting for docker image to come up');
+                setTimeout(() => {
+                    console.log('waiting finished')
+                    resolve()
+                },
+                    5000);
+            });
+        })
+        .then(() => {
+            return querySchema('http://localhost:4000/graphql');
+        })
+        .then((schema) => {
+            return sendSchema(schema, backendUrl, body);
+        })
+        .then((success) => {
+            console.log(success);
+        }, (failed) => {
+            console.log(failed);
+        })
+        .catch(error => {
+            console.log(error);
+        });
+
 }
 
 function runImage(imageId, containerPort) {
@@ -139,16 +168,16 @@ function execute(command, args) {
     });
 }
 
-async function sendSchema(schema, backendUrl, pullRequestData) {
-    const body = {
+async function sendSchema(schema, backendUrl, body) {
+    const completeBody = {
         schema,
-        ...pullRequestData
+        ...body
     }
 
     return await fetch(backendUrl + "?secret=na", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(completeBody),
     }).then(res => {
         console.log('send schema response:', res);
         return res.json();
