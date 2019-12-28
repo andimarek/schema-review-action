@@ -2508,7 +2508,7 @@ try {
         console.log(`payload for push ${context}`)
         handlePush(payload, dockerfilePath, containerPort);
     } else if (isPullRequest) {
-        handlePullRequest(payload);
+        handlePullRequest(payload, dockerfilePath, containerPort, mergeSha);
     } else {
         throw new Error(`triggered by unexpected event ${eventName}`);
     }
@@ -2535,7 +2535,7 @@ function handlePush(payload, dockerfilePath, containerPort) {
     querySchemaAndPush(dockerfilePath, containerPort, body);
 }
 
-function handlePullRequest(payload, dockerfilePath, containerPort) {
+function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha) {
     const pullRequest = payload['pull_request'];
     const prNumber = pullRequest.number;
     const repository = payload.repository;
@@ -2651,7 +2651,7 @@ async function sendSchema(schema, backendUrl, body) {
         body: JSON.stringify(completeBody),
     }).then(res => {
         console.log('send schema response:', res);
-        return res.json();
+        return res;
     });
 }
 
