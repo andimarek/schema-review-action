@@ -1,12 +1,5 @@
 name: 'GraphQL Schema review'
 description: 'Trigger schema review'
-inputs:
-  url: 
-    description: 'the schema review backend url'
-    required: true
-# outputs:
-#   success: 
-#     description: 'successful or not'
 runs:
   using: 'node12'
   main: 'dist/index.js'
