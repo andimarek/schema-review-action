@@ -11,8 +11,8 @@ import { printSchema } from 'graphql/utilities/schemaPrinter'
 const backendUrl = 'https://backend.graphql-consulting.com/schema-review/push';
 
 try {
-    const data = readSchemaReviewConfig();
-    const schemaSource = data['schema-source'];
+    const configData = readSchemaReviewConfig();
+    const schemaSource = configData['schema-source'];
     assertExists(schemaSource, "invalid config file; expect schema-source")
     const introspectServer = schemaSource['introspect-server'];
     assertExists(schemaSource, "invalid config file: expect introspect-server")
@@ -22,72 +22,79 @@ try {
     if (!dockerfilePath) {
         dockerfilePath = ".";
     }
-    // // const secret = core.getInput('schema-analysis-secret');
-    // const backendUrl = core.getInput('url');
     console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
 
-    // const payload = JSON.stringify(github.context, undefined, 2)
     const { eventName, payload, sha: mergeSha } = github.context;
-    const pullRequest = payload['pull_request'];
-    const prNumber = pullRequest.number;
     const action = payload.action;
-    const repository = payload.repository;
-    const repoId = repository.id;
-    const repoName = repository.name;
-    const repoOwner = repository.owner.login;
-
-    // const base = pullRequest.base;
-    const head = pullRequest.head;
-    const headSha = head.sha;
-
     console.log(`eventName ${eventName}`);
     console.log(`action ${action}`);
 
-    console.log(`repoId ${repoId}`);
-    console.log(`repoOwner ${repoOwner}`);
-    console.log(`repoName ${repoName}`);
+    const isPush = eventName === 'push';
+    const isPullRequest = eventName === 'pull_request';
+    if (isPush) {
+        const context = JSON.stringify(github.context, undefined, 2)
+        console.log(`payload for push ${context}`)
+    } else if(isPullRequest){
+        const pullRequest = payload['pull_request'];
+        const prNumber = pullRequest.number;
+        const repository = payload.repository;
+        const repoId = repository.id;
+        const repoName = repository.name;
+        const repoOwner = repository.owner.login;
 
-    console.log(`prNumber ${prNumber}`);
-    console.log(`mergeSha: ${mergeSha}`);
-    console.log(`headSha: ${headSha}`);
-    const pullRequestData = {
-        repoId,
-        repoOwner,
-        repoName,
-        prNumber,
-        mergeSha,
-        headSha
-    };
+        const head = pullRequest.head;
+        const headSha = head.sha;
 
 
-    buildDockerImage(dockerfilePath)
-        .then((imageId) => {
-            return runImage(imageId, containerPort);
-        })
-        .then(() => {
-            return new Promise(resolve => {
-                console.log('waiting for docker image to come up');
-                setTimeout(() => {
-                    console.log('waiting finished')
-                    resolve()
-                },
-                    5000);
+        console.log(`repoId ${repoId}`);
+        console.log(`repoOwner ${repoOwner}`);
+        console.log(`repoName ${repoName}`);
+
+        console.log(`prNumber ${prNumber}`);
+        console.log(`mergeSha: ${mergeSha}`);
+        console.log(`headSha: ${headSha}`);
+
+        const pullRequestData = {
+            repoId,
+            repoOwner,
+            repoName,
+            prNumber,
+            mergeSha,
+            headSha
+        };
+
+
+        buildDockerImage(dockerfilePath)
+            .then((imageId) => {
+                return runImage(imageId, containerPort);
+            })
+            .then(() => {
+                return new Promise(resolve => {
+                    console.log('waiting for docker image to come up');
+                    setTimeout(() => {
+                        console.log('waiting finished')
+                        resolve()
+                    },
+                        5000);
+                });
+            })
+            .then(() => {
+                return querySchema('http://localhost:4000/graphql');
+            })
+            .then((schema) => {
+                return sendSchema(schema, backendUrl, pullRequestData);
+            })
+            .then((success) => {
+                console.log(success);
+            }, (failed) => {
+                console.log(failed);
+            })
+            .catch(error => {
+                console.log(error);
             });
-        })
-        .then(() => {
-            return querySchema('http://localhost:4000/graphql');
-        })
-        .then((schema) => {
-            return sendSchema(schema, backendUrl, pullRequestData);
-        })
-        .then((success) => {
-            console.log(success);
-        }, (failed) => {
-            console.log(failed);
-        })
-        .catch(error => {
-            console.log(error);
-        });
+    }else {
+        throw new Error(`triggered by unexpected event ${eventName}`);
+    }
 
 } catch (error) {
     core.setFailed(error.message);
