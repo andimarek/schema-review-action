@@ -2545,7 +2545,7 @@ function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha) {
 
     const head = pullRequest.head;
     const headSha = head.sha;
-
+    const baseSha = pullRequest.base.sha;
 
     console.log(`repoId ${repoId}`);
     console.log(`repoOwner ${repoOwner}`);
@@ -2554,6 +2554,7 @@ function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha) {
     console.log(`prNumber ${prNumber}`);
     console.log(`mergeSha: ${mergeSha}`);
     console.log(`headSha: ${headSha}`);
+    console.log(`baseSha: ${baseSha}`);
 
     const body = {
         action: 'review',
@@ -2562,7 +2563,8 @@ function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha) {
         repoName,
         prNumber,
         mergeSha,
-        headSha
+        headSha,
+        baseSha
     };
 
     querySchemaAndPush(dockerfilePath, containerPort, body);
