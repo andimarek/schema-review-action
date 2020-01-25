@@ -11,7 +11,7 @@ import { printSchema } from 'graphql/utilities/schemaPrinter'
 const backendUrl = 'https://backend.graphql-consulting.com/schema-review/push';
 
 try {
-    const configData = readSchemaReviewConfig();
+    const { configData, fileContent } = readSchemaReviewConfig();
     const schemaSource = configData['schema-source'];
     assertExists(schemaSource, "invalid config file; expect schema-source")
     const introspectServer = schemaSource['introspect-server'];
@@ -37,7 +37,7 @@ try {
         console.log(`payload for push ${context}`)
         handlePush(payload, dockerfilePath, containerPort);
     } else if (isPullRequest) {
-        handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, configData);
+        handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent);
     } else {
         throw new Error(`triggered by unexpected event ${eventName}`);
     }
@@ -210,10 +210,10 @@ async function querySchema(endpoint) {
 }
 
 function readSchemaReviewConfig() {
-    let fileContents = fs.readFileSync('./schema-review.yml', 'utf8');
-    assertExists(fileContents, "expect schema-review.yml file");
-    let config = yaml.safeLoad(fileContents);
-    return config;
+    let fileContent = fs.readFileSync('./schema-review.yml', 'utf8');
+    assertExists(fileContent, "expect schema-review.yml file");
+    let configData = yaml.safeLoad(fileContent);
+    return { configData, fileContent };
 }
 
 function assertExists(val, message) {
