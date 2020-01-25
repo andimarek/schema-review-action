@@ -64,7 +64,7 @@ function handlePush(payload, dockerfilePath, containerPort) {
     querySchemaAndPush(dockerfilePath, containerPort, body);
 }
 
-function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha) {
+function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, configFile) {
     const pullRequest = payload['pull_request'];
     const prNumber = pullRequest.number;
     const repository = payload.repository;
@@ -75,6 +75,8 @@ function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha) {
     const head = pullRequest.head;
     const headSha = head.sha;
     const baseSha = pullRequest.base.sha;
+
+    const schemaReviewConfig = decodeBase64(configFile);
 
     console.log(`repoId ${repoId}`);
     console.log(`repoOwner ${repoOwner}`);
@@ -93,7 +95,8 @@ function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha) {
         prNumber,
         mergeSha,
         headSha,
-        baseSha
+        baseSha,
+        schemaReviewConfig
     };
 
     querySchemaAndPush(dockerfilePath, containerPort, body);
@@ -218,3 +221,8 @@ function assertExists(val, message) {
         throw new Error(message);
     }
 }
+
+function decodeBase64(string) {
+    return Buffer.from(str, 'utf8').toString('base64');
+}
+
