@@ -2,10 +2,11 @@
   "name": "action",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "ncc build index.js"
+    "build": "tsc",
+    "pack": "ncc build"
   },
   "keywords": [],
   "author": "",
@@ -13,9 +14,14 @@
   "dependencies": {
     "@actions/core": "^1.2.0",
     "@actions/github": "^2.0.0",
+    "@types/graphql": "^14.5.0",
+    "@types/js-yaml": "^3.12.2",
+    "@types/node": "^13.5.0",
+    "@types/node-fetch": "^2.5.4",
     "graphql": "^14.5.8",
     "js-yaml": "^3.13.1",
-    "node-fetch": "^2.6.0"
+    "node-fetch": "^2.6.0",
+    "typescript": "^3.7.5"
   },
   "devDependencies": {
     "@zeit/ncc": "^0.20.5",

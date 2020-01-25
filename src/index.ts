@@ -1,8 +1,10 @@
-const core = require('@actions/core');
-const github = require('@actions/github');
-const fs = require('fs');
-const yaml = require('js-yaml');
-import fetch from 'node-fetch'
+import * as core from "@actions/core";
+import * as github from "@actions/github";
+import * as fs from "fs";
+import * as yaml from "js-yaml";
+import fetch from "node-fetch";
+import { spawn } from "child_process";
+
 import { introspectionQuery } from 'graphql/utilities/introspectionQuery'
 import { buildClientSchema } from 'graphql/utilities/buildClientSchema'
 import { printSchema } from 'graphql/utilities/schemaPrinter'
@@ -18,7 +20,7 @@ try {
     assertExists(schemaSource, "invalid config file: expect introspect-server")
     const containerPort = introspectServer['container-port'];
     assertExists(schemaSource, "invalid config file: expect introspect-server: container-port")
-    const dockerfilePath = introspectServer['dockerfile-path'];
+    let dockerfilePath = introspectServer['dockerfile-path'];
     if (!dockerfilePath) {
         dockerfilePath = ".";
     }
@@ -46,7 +48,7 @@ try {
     core.setFailed(error.message);
 }
 
-function handlePush(payload, dockerfilePath, containerPort) {
+function handlePush(payload: any, dockerfilePath: string, containerPort: string) {
     const repository = payload.repository;
     const repoId = repository.id;
     const repoOwner = repository.owner.login;
@@ -64,7 +66,7 @@ function handlePush(payload, dockerfilePath, containerPort) {
     querySchemaAndPush(dockerfilePath, containerPort, body);
 }
 
-function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, configFile) {
+function handlePullRequest(payload: any, dockerfilePath: string, containerPort: string, mergeSha: string, configFile: string) {
     const pullRequest = payload['pull_request'];
     const prNumber = pullRequest.number;
     const repository = payload.repository;
@@ -102,9 +104,9 @@ function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, con
     querySchemaAndPush(dockerfilePath, containerPort, body);
 }
 
-function querySchemaAndPush(dockerfilePath, containerPort, body) {
+function querySchemaAndPush(dockerfilePath: string, containerPort: string, body: object) {
     buildDockerImage(dockerfilePath)
-        .then((imageId) => {
+        .then((imageId: string) => {
             return runImage(imageId, containerPort);
         })
         .then(() => {
@@ -134,34 +136,35 @@ function querySchemaAndPush(dockerfilePath, containerPort, body) {
 
 }
 
-function runImage(imageId, containerPort) {
+function runImage(imageId: string, containerPort: string) {
     return execute('docker', ['run', '-d', '-p', `4000:${containerPort}`, imageId]);
 }
 
-function buildDockerImage(dockerfilePath) {
-    return execute('docker', ['build', dockerfilePath, '-q']).then(
-        (imageId) => {
-            return imageId.trim();
-        },
-        (rejected) => {
-            console.log(`building image failed with ${rejected} `);
-        });
+function buildDockerImage(dockerfilePath: string): Promise<string> {
+    return execute('docker', ['build', dockerfilePath, '-q'])
+        .then(
+            (imageId: string) => {
+                return imageId.trim();
+            },
+            (rejected) => {
+                console.log(`building image failed with ${rejected} `);
+                throw new Error(rejected);
+            });
 }
 
-function execute(command, args) {
+function execute(command: string, args: any): Promise<string> {
     console.log('executing ', command, args);
-    const { spawn } = require('child_process');
     const ls = spawn(command, args);
     return new Promise((resolve, reject) => {
         let stdout = '';
-        ls.stdout.on('data', data => {
+        ls.stdout.on('data', (data: any) => {
             stdout += data;
         });
         let stderr = '';
-        ls.stderr.on('data', data => {
+        ls.stderr.on('data', (data: any) => {
             stderr += data;
         });
-        ls.on('close', code => {
+        ls.on('close', (code: any) => {
             console.log(`stdout: ${stdout} stderr: ${stderr} `);
             if (code == 0) {
                 resolve(stdout);
@@ -173,7 +176,7 @@ function execute(command, args) {
     });
 }
 
-async function sendSchema(schema, backendUrl, body) {
+async function sendSchema(schema: string, backendUrl: string, body: object) {
     const completeBody = {
         schema,
         ...body
@@ -189,7 +192,7 @@ async function sendSchema(schema, backendUrl, body) {
     });
 }
 
-async function querySchema(endpoint) {
+async function querySchema(endpoint: string): Promise<any> {
     const headers = { 'Content-Type': 'application/json' };
     try {
         console.log('query:' + endpoint);
@@ -216,13 +219,22 @@ function readSchemaReviewConfig() {
     return { configData, fileContent };
 }
 
-function assertExists(val, message) {
+function assertExists(val: any, message: string) {
     if (!val) {
         throw new Error(message);
     }
 }
 
-function decodeBase64(str) {
+function decodeBase64(str: string) {
     return Buffer.from(str, 'utf8').toString('base64');
 }
+
+
+
+const { eventName, payload, sha: mergeSha } = github.context;
+
+const action = payload.action;
+
+console.log(`eventName ${eventName}`);
+console.log(`action ${action}`);
 

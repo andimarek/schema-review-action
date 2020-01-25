@@ -34,10 +34,8 @@ module.exports =
 /******/ 	// the startup function
 /******/ 	function startup() {
 /******/ 		// Load entry module and return exports
-/******/ 		return __webpack_require__(104);
+/******/ 		return __webpack_require__(526);
 /******/ 	};
-/******/ 	// initialize runtime
-/******/ 	runtime(__webpack_require__);
 /******/
 /******/ 	// run startup
 /******/ 	return startup();
@@ -2452,251 +2450,6 @@ module.exports = new Type('tag:yaml.org,2002:set', {
   resolve: resolveYamlSet,
   construct: constructYamlSet
 });
-
-
-/***/ }),
-
-/***/ 104:
-/***/ (function(__unusedmodule, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var node_fetch__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(454);
-/* harmony import */ var node_fetch__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(node_fetch__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var graphql_utilities_introspectionQuery__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(773);
-/* harmony import */ var graphql_utilities_introspectionQuery__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(graphql_utilities_introspectionQuery__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var graphql_utilities_buildClientSchema__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(559);
-/* harmony import */ var graphql_utilities_buildClientSchema__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(graphql_utilities_buildClientSchema__WEBPACK_IMPORTED_MODULE_2__);
-/* harmony import */ var graphql_utilities_schemaPrinter__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(565);
-/* harmony import */ var graphql_utilities_schemaPrinter__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(graphql_utilities_schemaPrinter__WEBPACK_IMPORTED_MODULE_3__);
-const core = __webpack_require__(470);
-const github = __webpack_require__(469);
-const fs = __webpack_require__(747);
-const yaml = __webpack_require__(414);
-
-
-
-
-
-
-const backendUrl = 'https://backend.graphql-consulting.com/schema-review/push';
-
-try {
-    const { configData, fileContent } = readSchemaReviewConfig();
-    const schemaSource = configData['schema-source'];
-    assertExists(schemaSource, "invalid config file; expect schema-source")
-    const introspectServer = schemaSource['introspect-server'];
-    assertExists(schemaSource, "invalid config file: expect introspect-server")
-    const containerPort = introspectServer['container-port'];
-    assertExists(schemaSource, "invalid config file: expect introspect-server: container-port")
-    const dockerfilePath = introspectServer['dockerfile-path'];
-    if (!dockerfilePath) {
-        dockerfilePath = ".";
-    }
-    console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
-
-    const { eventName, payload, sha: mergeSha } = github.context;
-    const action = payload.action;
-    console.log(`eventName ${eventName}`);
-    console.log(`action ${action}`);
-
-    const isPush = eventName === 'push';
-    const isPullRequest = eventName === 'pull_request';
-
-    if (isPush) {
-        const context = JSON.stringify(github.context, undefined, 2)
-        console.log(`payload for push ${context}`)
-        handlePush(payload, dockerfilePath, containerPort);
-    } else if (isPullRequest) {
-        handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent);
-    } else {
-        throw new Error(`triggered by unexpected event ${eventName}`);
-    }
-
-} catch (error) {
-    core.setFailed(error.message);
-}
-
-function handlePush(payload, dockerfilePath, containerPort) {
-    const repository = payload.repository;
-    const repoId = repository.id;
-    const repoOwner = repository.owner.login;
-    const repoName = repository.name;
-    const sha = payload.after;
-
-    const body = {
-        action: 'push',
-        repoId,
-        repoOwner,
-        repoName,
-        sha
-    };
-
-    querySchemaAndPush(dockerfilePath, containerPort, body);
-}
-
-function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, configFile) {
-    const pullRequest = payload['pull_request'];
-    const prNumber = pullRequest.number;
-    const repository = payload.repository;
-    const repoId = repository.id;
-    const repoName = repository.name;
-    const repoOwner = repository.owner.login;
-
-    const head = pullRequest.head;
-    const headSha = head.sha;
-    const baseSha = pullRequest.base.sha;
-
-    const schemaReviewConfig = decodeBase64(configFile);
-
-    console.log(`repoId ${repoId}`);
-    console.log(`repoOwner ${repoOwner}`);
-    console.log(`repoName ${repoName}`);
-
-    console.log(`prNumber ${prNumber}`);
-    console.log(`mergeSha: ${mergeSha}`);
-    console.log(`headSha: ${headSha}`);
-    console.log(`baseSha: ${baseSha}`);
-
-    const body = {
-        action: 'review',
-        repoId,
-        repoOwner,
-        repoName,
-        prNumber,
-        mergeSha,
-        headSha,
-        baseSha,
-        schemaReviewConfig
-    };
-
-    querySchemaAndPush(dockerfilePath, containerPort, body);
-}
-
-function querySchemaAndPush(dockerfilePath, containerPort, body) {
-    buildDockerImage(dockerfilePath)
-        .then((imageId) => {
-            return runImage(imageId, containerPort);
-        })
-        .then(() => {
-            return new Promise(resolve => {
-                console.log('waiting for docker image to come up');
-                setTimeout(() => {
-                    console.log('waiting finished')
-                    resolve()
-                },
-                    5000);
-            });
-        })
-        .then(() => {
-            return querySchema('http://localhost:4000/graphql');
-        })
-        .then((schema) => {
-            return sendSchema(schema, backendUrl, body);
-        })
-        .then((success) => {
-            console.log(success);
-        }, (failed) => {
-            console.log(failed);
-        })
-        .catch(error => {
-            console.log(error);
-        });
-
-}
-
-function runImage(imageId, containerPort) {
-    return execute('docker', ['run', '-d', '-p', `4000:${containerPort}`, imageId]);
-}
-
-function buildDockerImage(dockerfilePath) {
-    return execute('docker', ['build', dockerfilePath, '-q']).then(
-        (imageId) => {
-            return imageId.trim();
-        },
-        (rejected) => {
-            console.log(`building image failed with ${rejected} `);
-        });
-}
-
-function execute(command, args) {
-    console.log('executing ', command, args);
-    const { spawn } = __webpack_require__(129);
-    const ls = spawn(command, args);
-    return new Promise((resolve, reject) => {
-        let stdout = '';
-        ls.stdout.on('data', data => {
-            stdout += data;
-        });
-        let stderr = '';
-        ls.stderr.on('data', data => {
-            stderr += data;
-        });
-        ls.on('close', code => {
-            console.log(`stdout: ${stdout} stderr: ${stderr} `);
-            if (code == 0) {
-                resolve(stdout);
-            } else {
-                reject(stderr);
-            }
-            console.log(`child process exited with code ${code} `);
-        });
-    });
-}
-
-async function sendSchema(schema, backendUrl, body) {
-    const completeBody = {
-        schema,
-        ...body
-    }
-
-    return await node_fetch__WEBPACK_IMPORTED_MODULE_0___default()(backendUrl + "?secret=na", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(completeBody),
-    }).then(res => {
-        console.log('send schema response:', res);
-        return res;
-    });
-}
-
-async function querySchema(endpoint) {
-    const headers = { 'Content-Type': 'application/json' };
-    try {
-        console.log('query:' + endpoint);
-        const { data, errors } = await node_fetch__WEBPACK_IMPORTED_MODULE_0___default()(endpoint, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ query: graphql_utilities_introspectionQuery__WEBPACK_IMPORTED_MODULE_1__.introspectionQuery }),
-        }).then(res => res.json())
-
-        if (errors) {
-            return { status: 'err', message: JSON.stringify(errors, null, 2) }
-        }
-        const schema = Object(graphql_utilities_buildClientSchema__WEBPACK_IMPORTED_MODULE_2__.buildClientSchema)(data)
-        return Object(graphql_utilities_schemaPrinter__WEBPACK_IMPORTED_MODULE_3__.printSchema)(schema);
-    } catch (err) {
-        return { status: 'err', message: err.message }
-    }
-}
-
-function readSchemaReviewConfig() {
-    let fileContent = fs.readFileSync('./schema-review.yml', 'utf8');
-    assertExists(fileContent, "expect schema-review.yml file");
-    let configData = yaml.safeLoad(fileContent);
-    return { configData, fileContent };
-}
-
-function assertExists(val, message) {
-    if (!val) {
-        throw new Error(message);
-    }
-}
-
-function decodeBase64(str) {
-    return Buffer.from(str, 'utf8').toString('base64');
-}
-
 
 
 /***/ }),
@@ -14797,6 +14550,242 @@ module.exports.Collection = Hook.Collection
 
 /***/ }),
 
+/***/ 526:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const core = __importStar(__webpack_require__(470));
+const github = __importStar(__webpack_require__(469));
+const fs = __importStar(__webpack_require__(747));
+const yaml = __importStar(__webpack_require__(414));
+const node_fetch_1 = __importDefault(__webpack_require__(454));
+const child_process_1 = __webpack_require__(129);
+const introspectionQuery_1 = __webpack_require__(773);
+const buildClientSchema_1 = __webpack_require__(559);
+const schemaPrinter_1 = __webpack_require__(565);
+const backendUrl = 'https://backend.graphql-consulting.com/schema-review/push';
+try {
+    const { configData, fileContent } = readSchemaReviewConfig();
+    const schemaSource = configData['schema-source'];
+    assertExists(schemaSource, "invalid config file; expect schema-source");
+    const introspectServer = schemaSource['introspect-server'];
+    assertExists(schemaSource, "invalid config file: expect introspect-server");
+    const containerPort = introspectServer['container-port'];
+    assertExists(schemaSource, "invalid config file: expect introspect-server: container-port");
+    let dockerfilePath = introspectServer['dockerfile-path'];
+    if (!dockerfilePath) {
+        dockerfilePath = ".";
+    }
+    console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
+    const { eventName, payload, sha: mergeSha } = github.context;
+    const action = payload.action;
+    console.log(`eventName ${eventName}`);
+    console.log(`action ${action}`);
+    const isPush = eventName === 'push';
+    const isPullRequest = eventName === 'pull_request';
+    if (isPush) {
+        const context = JSON.stringify(github.context, undefined, 2);
+        console.log(`payload for push ${context}`);
+        handlePush(payload, dockerfilePath, containerPort);
+    }
+    else if (isPullRequest) {
+        handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent);
+    }
+    else {
+        throw new Error(`triggered by unexpected event ${eventName}`);
+    }
+}
+catch (error) {
+    core.setFailed(error.message);
+}
+function handlePush(payload, dockerfilePath, containerPort) {
+    const repository = payload.repository;
+    const repoId = repository.id;
+    const repoOwner = repository.owner.login;
+    const repoName = repository.name;
+    const sha = payload.after;
+    const body = {
+        action: 'push',
+        repoId,
+        repoOwner,
+        repoName,
+        sha
+    };
+    querySchemaAndPush(dockerfilePath, containerPort, body);
+}
+function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, configFile) {
+    const pullRequest = payload['pull_request'];
+    const prNumber = pullRequest.number;
+    const repository = payload.repository;
+    const repoId = repository.id;
+    const repoName = repository.name;
+    const repoOwner = repository.owner.login;
+    const head = pullRequest.head;
+    const headSha = head.sha;
+    const baseSha = pullRequest.base.sha;
+    const schemaReviewConfig = decodeBase64(configFile);
+    console.log(`repoId ${repoId}`);
+    console.log(`repoOwner ${repoOwner}`);
+    console.log(`repoName ${repoName}`);
+    console.log(`prNumber ${prNumber}`);
+    console.log(`mergeSha: ${mergeSha}`);
+    console.log(`headSha: ${headSha}`);
+    console.log(`baseSha: ${baseSha}`);
+    const body = {
+        action: 'review',
+        repoId,
+        repoOwner,
+        repoName,
+        prNumber,
+        mergeSha,
+        headSha,
+        baseSha,
+        schemaReviewConfig
+    };
+    querySchemaAndPush(dockerfilePath, containerPort, body);
+}
+function querySchemaAndPush(dockerfilePath, containerPort, body) {
+    buildDockerImage(dockerfilePath)
+        .then((imageId) => {
+        return runImage(imageId, containerPort);
+    })
+        .then(() => {
+        return new Promise(resolve => {
+            console.log('waiting for docker image to come up');
+            setTimeout(() => {
+                console.log('waiting finished');
+                resolve();
+            }, 5000);
+        });
+    })
+        .then(() => {
+        return querySchema('http://localhost:4000/graphql');
+    })
+        .then((schema) => {
+        return sendSchema(schema, backendUrl, body);
+    })
+        .then((success) => {
+        console.log(success);
+    }, (failed) => {
+        console.log(failed);
+    })
+        .catch(error => {
+        console.log(error);
+    });
+}
+function runImage(imageId, containerPort) {
+    return execute('docker', ['run', '-d', '-p', `4000:${containerPort}`, imageId]);
+}
+function buildDockerImage(dockerfilePath) {
+    return execute('docker', ['build', dockerfilePath, '-q'])
+        .then((imageId) => {
+        return imageId.trim();
+    }, (rejected) => {
+        console.log(`building image failed with ${rejected} `);
+        throw new Error(rejected);
+    });
+}
+function execute(command, args) {
+    console.log('executing ', command, args);
+    const ls = child_process_1.spawn(command, args);
+    return new Promise((resolve, reject) => {
+        let stdout = '';
+        ls.stdout.on('data', (data) => {
+            stdout += data;
+        });
+        let stderr = '';
+        ls.stderr.on('data', (data) => {
+            stderr += data;
+        });
+        ls.on('close', (code) => {
+            console.log(`stdout: ${stdout} stderr: ${stderr} `);
+            if (code == 0) {
+                resolve(stdout);
+            }
+            else {
+                reject(stderr);
+            }
+            console.log(`child process exited with code ${code} `);
+        });
+    });
+}
+function sendSchema(schema, backendUrl, body) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const completeBody = Object.assign({ schema }, body);
+        return yield node_fetch_1.default(backendUrl + "?secret=na", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(completeBody),
+        }).then(res => {
+            console.log('send schema response:', res);
+            return res;
+        });
+    });
+}
+function querySchema(endpoint) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const headers = { 'Content-Type': 'application/json' };
+        try {
+            console.log('query:' + endpoint);
+            const { data, errors } = yield node_fetch_1.default(endpoint, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ query: introspectionQuery_1.introspectionQuery }),
+            }).then(res => res.json());
+            if (errors) {
+                return { status: 'err', message: JSON.stringify(errors, null, 2) };
+            }
+            const schema = buildClientSchema_1.buildClientSchema(data);
+            return schemaPrinter_1.printSchema(schema);
+        }
+        catch (err) {
+            return { status: 'err', message: err.message };
+        }
+    });
+}
+function readSchemaReviewConfig() {
+    let fileContent = fs.readFileSync('./schema-review.yml', 'utf8');
+    assertExists(fileContent, "expect schema-review.yml file");
+    let configData = yaml.safeLoad(fileContent);
+    return { configData, fileContent };
+}
+function assertExists(val, message) {
+    if (!val) {
+        throw new Error(message);
+    }
+}
+function decodeBase64(str) {
+    return Buffer.from(str, 'utf8').toString('base64');
+}
+const { eventName, payload, sha: mergeSha } = github.context;
+const action = payload.action;
+console.log(`eventName ${eventName}`);
+console.log(`action ${action}`);
+
+
+/***/ }),
+
 /***/ 527:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -23547,43 +23536,4 @@ module.exports = new Type('tag:yaml.org,2002:map', {
 
 /***/ })
 
-/******/ },
-/******/ function(__webpack_require__) { // webpackRuntimeModules
-/******/ 	"use strict";
-/******/ 
-/******/ 	/* webpack/runtime/make namespace object */
-/******/ 	!function() {
-/******/ 		// define __esModule on exports
-/******/ 		__webpack_require__.r = function(exports) {
-/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
-/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
-/******/ 			}
-/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
-/******/ 		};
-/******/ 	}();
-/******/ 	
-/******/ 	/* webpack/runtime/compat get default export */
-/******/ 	!function() {
-/******/ 		// getDefaultExport function for compatibility with non-harmony modules
-/******/ 		__webpack_require__.n = function(module) {
-/******/ 			var getter = module && module.__esModule ?
-/******/ 				function getDefault() { return module['default']; } :
-/******/ 				function getModuleExports() { return module; };
-/******/ 			__webpack_require__.d(getter, 'a', getter);
-/******/ 			return getter;
-/******/ 		};
-/******/ 	}();
-/******/ 	
-/******/ 	/* webpack/runtime/define property getter */
-/******/ 	!function() {
-/******/ 		// define getter function for harmony exports
-/******/ 		var hasOwnProperty = Object.prototype.hasOwnProperty;
-/******/ 		__webpack_require__.d = function(exports, name, getter) {
-/******/ 			if(!hasOwnProperty.call(exports, name)) {
-/******/ 				Object.defineProperty(exports, name, { enumerable: true, get: getter });
-/******/ 			}
-/******/ 		};
-/******/ 	}();
-/******/ 	
-/******/ }
-);
+/******/ });
