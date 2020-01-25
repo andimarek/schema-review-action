@@ -37,7 +37,7 @@ try {
         console.log(`payload for push ${context}`)
         handlePush(payload, dockerfilePath, containerPort);
     } else if (isPullRequest) {
-        handlePullRequest(payload, dockerfilePath, containerPort, mergeSha);
+        handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, configData);
     } else {
         throw new Error(`triggered by unexpected event ${eventName}`);
     }
