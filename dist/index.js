@@ -2693,7 +2693,7 @@ function assertExists(val, message) {
     }
 }
 
-function decodeBase64(string) {
+function decodeBase64(str) {
     return Buffer.from(str, 'utf8').toString('base64');
 }
 
