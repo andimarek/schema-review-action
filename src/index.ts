@@ -9,6 +9,8 @@ import { introspectionQuery } from 'graphql/utilities/introspectionQuery'
 import { buildClientSchema } from 'graphql/utilities/buildClientSchema'
 import { printSchema } from 'graphql/utilities/schemaPrinter'
 
+import { CreateGitHubCheckPayload, NewSchemaVersionGitHubPayload } from './types';
+
 
 const backendUrl = 'https://backend.graphql-consulting.com/schema-review/push';
 
@@ -50,27 +52,29 @@ try {
 
 function handlePush(payload: any, dockerfilePath: string, containerPort: string) {
     const repository = payload.repository;
-    const repoId = repository.id;
+    const repoId = repository.id.toString();
     const repoOwner = repository.owner.login;
     const repoName = repository.name;
     const sha = payload.after;
 
-    const body = {
-        action: 'push',
+    const input = {
         repoId,
         repoOwner,
         repoName,
         sha
     };
 
-    querySchemaAndPush(dockerfilePath, containerPort, body);
+    startImageAndQuerySchema(dockerfilePath, containerPort)
+        .then((schema) => {
+            newSchemaVersion({ ...input, schema }, backendUrl);
+        });
 }
 
 function handlePullRequest(payload: any, dockerfilePath: string, containerPort: string, mergeSha: string, configFile: string) {
     const pullRequest = payload['pull_request'];
-    const prNumber = pullRequest.number;
+    const prNumber = pullRequest.number.toString();
     const repository = payload.repository;
-    const repoId = repository.id;
+    const repoId = repository.id.toString();
     const repoName = repository.name;
     const repoOwner = repository.owner.login;
 
@@ -78,7 +82,7 @@ function handlePullRequest(payload: any, dockerfilePath: string, containerPort: 
     const headSha = head.sha;
     const baseSha = pullRequest.base.sha;
 
-    const schemaReviewConfig = decodeBase64(configFile);
+    const configFileEncoded = encodeBase64(configFile);
 
     console.log(`repoId ${repoId}`);
     console.log(`repoOwner ${repoOwner}`);
@@ -89,8 +93,7 @@ function handlePullRequest(payload: any, dockerfilePath: string, containerPort: 
     console.log(`headSha: ${headSha}`);
     console.log(`baseSha: ${baseSha}`);
 
-    const body = {
-        action: 'review',
+    const input = {
         repoId,
         repoOwner,
         repoName,
@@ -98,14 +101,17 @@ function handlePullRequest(payload: any, dockerfilePath: string, containerPort: 
         mergeSha,
         headSha,
         baseSha,
-        schemaReviewConfig
+        configFile: configFileEncoded
     };
 
-    querySchemaAndPush(dockerfilePath, containerPort, body);
+    startImageAndQuerySchema(dockerfilePath, containerPort)
+        .then((schema) => {
+            createGitHubCheck({ ...input, schema }, backendUrl);
+        });
 }
 
-function querySchemaAndPush(dockerfilePath: string, containerPort: string, body: object) {
-    buildDockerImage(dockerfilePath)
+function startImageAndQuerySchema(dockerfilePath: string, containerPort: string): Promise<string> {
+    return buildDockerImage(dockerfilePath)
         .then((imageId: string) => {
             return runImage(imageId, containerPort);
         })
@@ -122,18 +128,9 @@ function querySchemaAndPush(dockerfilePath: string, containerPort: string, body:
         .then(() => {
             return querySchema('http://localhost:4000/graphql');
         })
-        .then((schema) => {
-            return sendSchema(schema, backendUrl, body);
-        })
-        .then((success) => {
-            console.log(success);
-        }, (failed) => {
-            console.log(failed);
-        })
         .catch(error => {
             console.log(error);
         });
-
 }
 
 function runImage(imageId: string, containerPort: string) {
@@ -176,16 +173,35 @@ function execute(command: string, args: any): Promise<string> {
     });
 }
 
-async function sendSchema(schema: string, backendUrl: string, body: object) {
-    const completeBody = {
-        schema,
-        ...body
-    }
+async function createGitHubCheck(input: CreateGitHubCheckPayload, backendUrl: string) {
+    const query = `mutation createGitHubCheck($input: CreateGitHubCheckPayload!){
+        createGitHubCheck(input: $input) {
+            success
+            message
+        }
+    }`;
+    return sendGraphQL(query, { input }, backendUrl);
+}
 
+async function newSchemaVersion(input: NewSchemaVersionGitHubPayload, backendUrl: string) {
+    const query = `mutation newSchemaVersion($input: NewSchemaVersionGitHubPayload!){
+        newSchemaVersionGitHub(input: $input) {
+            success
+            message
+        }
+    }`;
+    return sendGraphQL(query, { input }, backendUrl);
+}
+
+async function sendGraphQL(query: string, variables: { [key: string]: any }, backendUrl: string): Promise<any> {
+    const body = {
+        query,
+        variables
+    };
     return await fetch(backendUrl + "?secret=na", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(completeBody),
+        body: JSON.stringify(body),
     }).then(res => {
         console.log('send schema response:', res);
         return res;
@@ -225,7 +241,7 @@ function assertExists(val: any, message: string) {
     }
 }
 
-function decodeBase64(str: string) {
+function encodeBase64(str: string) {
     return Buffer.from(str, 'utf8').toString('base64');
 }
 
