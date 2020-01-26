@@ -12,7 +12,7 @@ import { printSchema } from 'graphql/utilities/schemaPrinter'
 import { CreateGitHubCheckPayload, NewSchemaVersionGitHubPayload } from './types';
 
 
-const backendUrl = 'https://backend.graphql-consulting.com/schema-review/push';
+const backendUrl = 'https://backend.graphql-consulting.com/graphql';
 
 try {
     const { configData, fileContent } = readSchemaReviewConfig();

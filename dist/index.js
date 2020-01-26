@@ -16866,7 +16866,7 @@ const child_process_1 = __webpack_require__(129);
 const introspectionQuery_1 = __webpack_require__(773);
 const buildClientSchema_1 = __webpack_require__(559);
 const schemaPrinter_1 = __webpack_require__(565);
-const backendUrl = 'https://backend.graphql-consulting.com/schema-review/push';
+const backendUrl = 'https://backend.graphql-consulting.com/graphql';
 try {
     const { configData, fileContent } = readSchemaReviewConfig();
     const schemaSource = configData['schema-source'];
