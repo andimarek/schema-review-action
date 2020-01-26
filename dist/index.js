@@ -17041,7 +17041,7 @@ function sendGraphQL(query, variables, backendUrl) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         }).then(res => {
-            console.log('send schema response:', res);
+            console.log('send graphql response:', res.json());
             return res;
         });
     });
