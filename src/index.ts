@@ -98,7 +98,6 @@ function handlePullRequest(payload: any, dockerfilePath: string, containerPort: 
         repoOwner,
         repoName,
         prNumber,
-        mergeSha,
         headSha,
         baseSha,
         configFile: configFileEncoded
@@ -204,7 +203,9 @@ async function sendGraphQL(query: string, variables: { [key: string]: any }, bac
         body: JSON.stringify(body),
     }).then(res => {
         console.log('send graphql response:', res);
-        console.log('send graphql response body:', res.json());
+        res.json().then(json => {
+            console.log('send graphql response body:', json);
+        });
         return res;
     });
 }
