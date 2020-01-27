@@ -128,9 +128,6 @@ function startImageAndQuerySchema(dockerfilePath: string, containerPort: string)
         })
         .then(() => {
             return querySchema('http://localhost:4000/graphql');
-        })
-        .catch(error => {
-            console.log(error);
         });
 }
 
@@ -205,13 +202,13 @@ async function sendGraphQL(query: string, variables: { [key: string]: any }, bac
         body: JSON.stringify(body),
     }).then(res => {
         console.log('send graphql response:', res);
-        res.json().then(json => {
+        return res.json().then(json => {
             console.log('send graphql response body:', json);
             if (json.errors && json.errors.length > 0) {
                 throw new Error(`GraphQL response contains errors: ${JSON.stringify(json.errors)}`);
             }
+            return json;
         });
-        return res;
     });
 }
 
