@@ -16894,7 +16894,6 @@ function run() {
             const isPullRequest = eventName === 'pull_request';
             if (isPush) {
                 const context = JSON.stringify(github.context, undefined, 2);
-                console.log(`payload for push ${context}`);
                 yield handlePush(payload, dockerfilePath, containerPort, secret);
             }
             else if (isPullRequest) {

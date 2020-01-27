@@ -44,7 +44,6 @@ async function run() {
 
         if (isPush) {
             const context = JSON.stringify(github.context, undefined, 2)
-            console.log(`payload for push ${context}`)
             await handlePush(payload, dockerfilePath, containerPort, secret);
         } else if (isPullRequest) {
             await handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent, secret);
