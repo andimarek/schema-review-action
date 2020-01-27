@@ -17043,6 +17043,9 @@ function sendGraphQL(query, variables, backendUrl) {
             console.log('send graphql response:', res);
             res.json().then(json => {
                 console.log('send graphql response body:', json);
+                if (json.errors && json.errors.length > 0) {
+                    throw new Error(`GraphQL response contains errors: ${JSON.stringify(json.errors)}`);
+                }
             });
             return res;
         });
@@ -17083,10 +17086,6 @@ function assertExists(val, message) {
 function encodeBase64(str) {
     return Buffer.from(str, 'utf8').toString('base64');
 }
-const { eventName, payload, sha: mergeSha } = github.context;
-const action = payload.action;
-console.log(`eventName ${eventName}`);
-console.log(`action ${action}`);
 
 
 /***/ }),
