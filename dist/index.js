@@ -16867,39 +16867,43 @@ const introspectionQuery_1 = __webpack_require__(773);
 const buildClientSchema_1 = __webpack_require__(559);
 const schemaPrinter_1 = __webpack_require__(565);
 const backendUrl = 'https://backend.graphql-consulting.com/graphql';
-try {
-    const { configData, fileContent } = readSchemaReviewConfig();
-    const schemaSource = configData['schema-source'];
-    assertExists(schemaSource, "invalid config file; expect schema-source");
-    const introspectServer = schemaSource['introspect-server'];
-    assertExists(schemaSource, "invalid config file: expect introspect-server");
-    const containerPort = introspectServer['container-port'];
-    assertExists(schemaSource, "invalid config file: expect introspect-server: container-port");
-    let dockerfilePath = introspectServer['dockerfile-path'];
-    if (!dockerfilePath) {
-        dockerfilePath = ".";
-    }
-    console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
-    const { eventName, payload, sha: mergeSha } = github.context;
-    const action = payload.action;
-    console.log(`eventName ${eventName}`);
-    console.log(`action ${action}`);
-    const isPush = eventName === 'push';
-    const isPullRequest = eventName === 'pull_request';
-    if (isPush) {
-        const context = JSON.stringify(github.context, undefined, 2);
-        console.log(`payload for push ${context}`);
-        handlePush(payload, dockerfilePath, containerPort);
-    }
-    else if (isPullRequest) {
-        handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent);
-    }
-    else {
-        throw new Error(`triggered by unexpected event ${eventName}`);
-    }
-}
-catch (error) {
-    core.setFailed(error.message);
+function run() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { configData, fileContent } = readSchemaReviewConfig();
+            const schemaSource = configData['schema-source'];
+            assertExists(schemaSource, "invalid config file; expect schema-source");
+            const introspectServer = schemaSource['introspect-server'];
+            assertExists(schemaSource, "invalid config file: expect introspect-server");
+            const containerPort = introspectServer['container-port'];
+            assertExists(schemaSource, "invalid config file: expect introspect-server: container-port");
+            let dockerfilePath = introspectServer['dockerfile-path'];
+            if (!dockerfilePath) {
+                dockerfilePath = ".";
+            }
+            console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
+            const { eventName, payload, sha: mergeSha } = github.context;
+            const action = payload.action;
+            console.log(`eventName ${eventName}`);
+            console.log(`action ${action}`);
+            const isPush = eventName === 'push';
+            const isPullRequest = eventName === 'pull_request';
+            if (isPush) {
+                const context = JSON.stringify(github.context, undefined, 2);
+                console.log(`payload for push ${context}`);
+                yield handlePush(payload, dockerfilePath, containerPort);
+            }
+            else if (isPullRequest) {
+                yield handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent);
+            }
+            else {
+                throw new Error(`triggered by unexpected event ${eventName}`);
+            }
+        }
+        catch (error) {
+            core.setFailed(error.message);
+        }
+    });
 }
 function handlePush(payload, dockerfilePath, containerPort) {
     const repository = payload.repository;
@@ -16915,7 +16919,7 @@ function handlePush(payload, dockerfilePath, containerPort) {
     };
     startImageAndQuerySchema(dockerfilePath, containerPort)
         .then((schema) => {
-        newSchemaVersion(Object.assign(Object.assign({}, input), { schema }), backendUrl);
+        return sendNewSchemaVersion(Object.assign(Object.assign({}, input), { schema }), backendUrl);
     });
 }
 function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, configFile) {
@@ -16945,9 +16949,9 @@ function handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, con
         baseSha,
         configFile: configFileEncoded
     };
-    startImageAndQuerySchema(dockerfilePath, containerPort)
+    return startImageAndQuerySchema(dockerfilePath, containerPort)
         .then((schema) => {
-        createGitHubCheck(Object.assign(Object.assign({}, input), { schema }), backendUrl);
+        return createGitHubCheck(Object.assign(Object.assign({}, input), { schema }), backendUrl);
     });
 }
 function startImageAndQuerySchema(dockerfilePath, containerPort) {
@@ -16966,9 +16970,6 @@ function startImageAndQuerySchema(dockerfilePath, containerPort) {
     })
         .then(() => {
         return querySchema('http://localhost:4000/graphql');
-    })
-        .catch(error => {
-        console.log(error);
     });
 }
 function runImage(imageId, containerPort) {
@@ -17018,7 +17019,7 @@ function createGitHubCheck(input, backendUrl) {
         return sendGraphQL(query, { input }, backendUrl);
     });
 }
-function newSchemaVersion(input, backendUrl) {
+function sendNewSchemaVersion(input, backendUrl) {
     return __awaiter(this, void 0, void 0, function* () {
         const query = `mutation newSchemaVersion($input: NewSchemaVersionGitHubPayload!){
         newSchemaVersionGitHub(input: $input) {
@@ -17035,19 +17036,19 @@ function sendGraphQL(query, variables, backendUrl) {
             query,
             variables
         };
-        return yield node_fetch_1.default(backendUrl + "?secret=na", {
+        return yield node_fetch_1.default(backendUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         }).then(res => {
             console.log('send graphql response:', res);
-            res.json().then(json => {
+            return res.json().then(json => {
                 console.log('send graphql response body:', json);
                 if (json.errors && json.errors.length > 0) {
                     throw new Error(`GraphQL response contains errors: ${JSON.stringify(json.errors)}`);
                 }
+                return json;
             });
-            return res;
         });
     });
 }
@@ -17086,6 +17087,7 @@ function assertExists(val, message) {
 function encodeBase64(str) {
     return Buffer.from(str, 'utf8').toString('base64');
 }
+run();
 
 
 /***/ }),
