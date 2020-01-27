@@ -16,7 +16,10 @@ const backendUrl = 'https://backend.graphql-consulting.com/graphql';
 
 async function run() {
     try {
-        console.log('github:', JSON.stringify(github, null, 2));
+        const secret = core.getInput("secret");
+        if (!secret) {
+            throw new Error("missing required input 'secret'");
+        }
         const { configData, fileContent } = readSchemaReviewConfig();
         const schemaSource = configData['schema-source'];
         assertExists(schemaSource, "invalid config file; expect schema-source")
@@ -42,9 +45,9 @@ async function run() {
         if (isPush) {
             const context = JSON.stringify(github.context, undefined, 2)
             console.log(`payload for push ${context}`)
-            await handlePush(payload, dockerfilePath, containerPort);
+            await handlePush(payload, dockerfilePath, containerPort, secret);
         } else if (isPullRequest) {
-            await handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent);
+            await handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent, secret);
         } else {
             throw new Error(`triggered by unexpected event ${eventName}`);
         }
@@ -54,7 +57,7 @@ async function run() {
     }
 }
 
-function handlePush(payload: any, dockerfilePath: string, containerPort: string) {
+function handlePush(payload: any, dockerfilePath: string, containerPort: string, secret: string) {
     const repository = payload.repository;
     const repoId = repository.id.toString();
     const repoOwner = repository.owner.login;
@@ -65,7 +68,8 @@ function handlePush(payload: any, dockerfilePath: string, containerPort: string)
         repoId,
         repoOwner,
         repoName,
-        sha
+        sha,
+        secret
     };
 
     startImageAndQuerySchema(dockerfilePath, containerPort)
@@ -74,7 +78,13 @@ function handlePush(payload: any, dockerfilePath: string, containerPort: string)
         });
 }
 
-function handlePullRequest(payload: any, dockerfilePath: string, containerPort: string, mergeSha: string, configFile: string) {
+function handlePullRequest(payload: any,
+    dockerfilePath: string,
+    containerPort: string,
+    mergeSha: string,
+    configFile: string,
+    secret: string) {
+
     const pullRequest = payload['pull_request'];
     const prNumber = pullRequest.number.toString();
     const repository = payload.repository;
@@ -104,7 +114,8 @@ function handlePullRequest(payload: any, dockerfilePath: string, containerPort: 
         prNumber,
         headSha,
         baseSha,
-        configFile: configFileEncoded
+        configFile: configFileEncoded,
+        secret
     };
 
     return startImageAndQuerySchema(dockerfilePath, containerPort)
