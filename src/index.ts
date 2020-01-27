@@ -16,6 +16,7 @@ const backendUrl = 'https://backend.graphql-consulting.com/graphql';
 
 async function run() {
     try {
+        console.log('github:', JSON.stringify(github, null, 2));
         const { configData, fileContent } = readSchemaReviewConfig();
         const schemaSource = configData['schema-source'];
         assertExists(schemaSource, "invalid config file; expect schema-source")
@@ -30,6 +31,7 @@ async function run() {
         console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
 
         const { eventName, payload, sha: mergeSha } = github.context;
+
         const action = payload.action;
         console.log(`eventName ${eventName}`);
         console.log(`action ${action}`);

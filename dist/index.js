@@ -16870,6 +16870,7 @@ const backendUrl = 'https://backend.graphql-consulting.com/graphql';
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            console.log('github:', JSON.stringify(github, null, 2));
             const { configData, fileContent } = readSchemaReviewConfig();
             const schemaSource = configData['schema-source'];
             assertExists(schemaSource, "invalid config file; expect schema-source");
