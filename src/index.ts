@@ -14,40 +14,42 @@ import { CreateGitHubCheckPayload, NewSchemaVersionGitHubPayload } from './types
 
 const backendUrl = 'https://backend.graphql-consulting.com/graphql';
 
-try {
-    const { configData, fileContent } = readSchemaReviewConfig();
-    const schemaSource = configData['schema-source'];
-    assertExists(schemaSource, "invalid config file; expect schema-source")
-    const introspectServer = schemaSource['introspect-server'];
-    assertExists(schemaSource, "invalid config file: expect introspect-server")
-    const containerPort = introspectServer['container-port'];
-    assertExists(schemaSource, "invalid config file: expect introspect-server: container-port")
-    let dockerfilePath = introspectServer['dockerfile-path'];
-    if (!dockerfilePath) {
-        dockerfilePath = ".";
+async function run() {
+    try {
+        const { configData, fileContent } = readSchemaReviewConfig();
+        const schemaSource = configData['schema-source'];
+        assertExists(schemaSource, "invalid config file; expect schema-source")
+        const introspectServer = schemaSource['introspect-server'];
+        assertExists(schemaSource, "invalid config file: expect introspect-server")
+        const containerPort = introspectServer['container-port'];
+        assertExists(schemaSource, "invalid config file: expect introspect-server: container-port")
+        let dockerfilePath = introspectServer['dockerfile-path'];
+        if (!dockerfilePath) {
+            dockerfilePath = ".";
+        }
+        console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
+
+        const { eventName, payload, sha: mergeSha } = github.context;
+        const action = payload.action;
+        console.log(`eventName ${eventName}`);
+        console.log(`action ${action}`);
+
+        const isPush = eventName === 'push';
+        const isPullRequest = eventName === 'pull_request';
+
+        if (isPush) {
+            const context = JSON.stringify(github.context, undefined, 2)
+            console.log(`payload for push ${context}`)
+            await handlePush(payload, dockerfilePath, containerPort);
+        } else if (isPullRequest) {
+            await handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent);
+        } else {
+            throw new Error(`triggered by unexpected event ${eventName}`);
+        }
+
+    } catch (error) {
+        core.setFailed(error.message);
     }
-    console.log(`config: container port: ${containerPort}, url: ${backendUrl}, dockerfile path: ${dockerfilePath}`);
-
-    const { eventName, payload, sha: mergeSha } = github.context;
-    const action = payload.action;
-    console.log(`eventName ${eventName}`);
-    console.log(`action ${action}`);
-
-    const isPush = eventName === 'push';
-    const isPullRequest = eventName === 'pull_request';
-
-    if (isPush) {
-        const context = JSON.stringify(github.context, undefined, 2)
-        console.log(`payload for push ${context}`)
-        handlePush(payload, dockerfilePath, containerPort);
-    } else if (isPullRequest) {
-        handlePullRequest(payload, dockerfilePath, containerPort, mergeSha, fileContent);
-    } else {
-        throw new Error(`triggered by unexpected event ${eventName}`);
-    }
-
-} catch (error) {
-    core.setFailed(error.message);
 }
 
 function handlePush(payload: any, dockerfilePath: string, containerPort: string) {
@@ -66,7 +68,7 @@ function handlePush(payload: any, dockerfilePath: string, containerPort: string)
 
     startImageAndQuerySchema(dockerfilePath, containerPort)
         .then((schema) => {
-            newSchemaVersion({ ...input, schema }, backendUrl);
+            return sendNewSchemaVersion({ ...input, schema }, backendUrl);
         });
 }
 
@@ -103,9 +105,9 @@ function handlePullRequest(payload: any, dockerfilePath: string, containerPort: 
         configFile: configFileEncoded
     };
 
-    startImageAndQuerySchema(dockerfilePath, containerPort)
+    return startImageAndQuerySchema(dockerfilePath, containerPort)
         .then((schema) => {
-            createGitHubCheck({ ...input, schema }, backendUrl);
+            return createGitHubCheck({ ...input, schema }, backendUrl);
         });
 }
 
@@ -182,7 +184,7 @@ async function createGitHubCheck(input: CreateGitHubCheckPayload, backendUrl: st
     return sendGraphQL(query, { input }, backendUrl);
 }
 
-async function newSchemaVersion(input: NewSchemaVersionGitHubPayload, backendUrl: string) {
+async function sendNewSchemaVersion(input: NewSchemaVersionGitHubPayload, backendUrl: string) {
     const query = `mutation newSchemaVersion($input: NewSchemaVersionGitHubPayload!){
         newSchemaVersionGitHub(input: $input) {
             success
@@ -197,7 +199,7 @@ async function sendGraphQL(query: string, variables: { [key: string]: any }, bac
         query,
         variables
     };
-    return await fetch(backendUrl + "?secret=na", {
+    return await fetch(backendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -250,4 +252,5 @@ function encodeBase64(str: string) {
     return Buffer.from(str, 'utf8').toString('base64');
 }
 
+run();
 
